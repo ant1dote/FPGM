@@ -24,11 +24,11 @@ from util.val_2d import  test_isic_images
 import random
 from scipy.signal import find_peaks
 
-parser = argparse.ArgumentParser(description='Revisiting Weak-to-Strong Consistency in Semi-Supervised Semantic Segmentation')
-parser.add_argument('--config', type=str, default='/home/wth/My_codes/SSL_MIS_Exps/Freq_adaptive_modulation/configs/kvasir.yaml')
-parser.add_argument('--labeled-id-path', type=str, default='/home/wth/My_codes/SSL_MIS_Exps/polyp/10%_labeled.txt')
-parser.add_argument('--unlabeled-id-path', type=str, default='/home/wth/My_codes/SSL_MIS_Exps/polyp/10%_unlabeled.txt')
-parser.add_argument('--save-path', type=str, default='/home/wth/My_codes/SSL_MIS_Exps/models/KVASIR')
+parser = argparse.ArgumentParser(description='FPGM')
+parser.add_argument('--config', type=str, default='')
+parser.add_argument('--labeled-id-path', type=str, default='')
+parser.add_argument('--unlabeled-id-path', type=str, default='')
+parser.add_argument('--save-path', type=str, default='')
 parser.add_argument('--seed', type=int,  default=1337, help='random seed')
 parser.add_argument('--deterministic', type=int,  default=1, help='whether use deterministic training')
 parser.add_argument('--local_rank', default=0, type=int)
@@ -44,26 +44,18 @@ if args.deterministic:
     torch.cuda.manual_seed(args.seed)
 
 def plot_and_save_profile(profile_tensor, peaks_indices, iteration, save_dir):
-    """
-    将给定的频率谱和峰值绘制成图表，并保存到指定目录。
-
-    Args:
-        profile_tensor (torch.Tensor): 一维的频率谱张量。
-        peaks_indices (list or np.array): 检测到的峰值索引。
-        iteration (int): 当前的训练迭代次数。
-        save_dir (str): 保存图像的目录。
-    """
+    
     if profile_tensor is None:
         return
 
     profile_np = profile_tensor.cpu().numpy()
     
-    # --- 绘图设置 ---
+    
     sns.set_theme(style="whitegrid")
     plt.figure(figsize=(10, 6), dpi=1000)
     plt.rcParams['font.family'] = 'Arial'
 
-    # --- 绘制主曲线和峰值 ---
+    
     plt.plot(profile_np, label='Running-Mean Frequency Profile (P)', color='dodgerblue', lw=2.5)
     
     if len(peaks_indices) > 0:
@@ -96,19 +88,11 @@ def plot_and_save_profile(profile_tensor, peaks_indices, iteration, save_dir):
     output_path = os.path.join(evolution_dir, f'iter_{iteration}.png')
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     
-    # 关闭图形，释放内存，这在长时训练中非常重要！
+    
     plt.close()
 
 class FreqPerturbation(nn.Module):
-    """
-    通过频谱形状匹配 (Spectral Shape Matching) 进行图像扰动。
-
-    此模块通过以下步骤实现理论上更严谨的知识迁移：
-    1. 从有标签数据的“纯净”边缘信号中学习频率先验 P_prior 的“形状”。
-    2. 对无标签的“混杂”完整图像频谱 P_u 进行归一化，提取其“形状”。
-    3. 在形状空间进行插值，生成新的频谱形状 P_pert_norm。
-    4. 将新的形状乘以 P_u 的原始能量，恢复其尺度，完成扰动。
-    """
+    
     def __init__(self, 
                  gamma: float = 0.05, 
                  momentum: float = 0.999, 
