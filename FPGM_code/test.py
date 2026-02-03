@@ -16,7 +16,7 @@ from model.unet import UNet
 #from model.Unet import UNet
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--root_path', type=str, default='/home/user/polyp', help='Name of Experiment')
+parser.add_argument('--root_path', type=str, default='/path/your/data/polyp', help='Name of Experiment')
 parser.add_argument('--exp', type=str, default='FPGM', help='experiment_name')
 parser.add_argument('--model', type=str, default='unet', help='model_name')
 parser.add_argument('--num_classes', type=int,  default=2, help='output channel of network')
@@ -107,7 +107,7 @@ def Inference(FLAGS):
         image_list = f.readlines()
     image_list = sorted([item.replace('\n', '').split(".")[0] for item in image_list])
     snapshot_path = "./model/ACDC_{}_{}_labeled/{}".format(FLAGS.exp, FLAGS.labelnum, FLAGS.model)
-    test_save_path = r"/media/user/SX5PRO/FPGM_visualization/bkai_10%labeled/{}_{}_{}_predictions/".format(FLAGS.exp, FLAGS.labelnum, FLAGS.model)
+    test_save_path = r"/path/your/ckpt/{}_{}_{}_predictions/".format(FLAGS.exp, FLAGS.labelnum, FLAGS.model)
     if os.path.exists(test_save_path):
         shutil.rmtree(test_save_path)
     os.makedirs(test_save_path)
@@ -115,7 +115,7 @@ def Inference(FLAGS):
     net = UNet(in_chns=3, class_num=2).cuda()
     
     #save_model_path = os.path.join(snapshot_path, '{}_best_model.pth'.format(FLAGS.model))
-    save_model_path = '/media/user/SX5PRO/freq_prior/polyp_unimatch_freq_prior_matchingnorm_mix_280labeled/unet_best_model.pth'
+    save_model_path = '/path/to/save'
     net.load_state_dict(torch.load(save_model_path), strict=True)
     print("init weight from {}".format(save_model_path))
     net.eval()
