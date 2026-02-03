@@ -24,11 +24,11 @@ from util.val_2d import  test_isic_images
 import random
 from scipy.signal import find_peaks
 
-parser = argparse.ArgumentParser(description='Revisiting Weak-to-Strong Consistency in Semi-Supervised Semantic Segmentation')
-parser.add_argument('--config', type=str, default='/home/wth/My_codes/SSL_MIS_Exps/Freq_adaptive_modulation/configs/kvasir.yaml')
-parser.add_argument('--labeled-id-path', type=str, default='/home/wth/My_codes/SSL_MIS_Exps/polyp/10%_labeled.txt')
-parser.add_argument('--unlabeled-id-path', type=str, default='/home/wth/My_codes/SSL_MIS_Exps/polyp/10%_unlabeled.txt')
-parser.add_argument('--save-path', type=str, default='/home/wth/My_codes/SSL_MIS_Exps/models/KVASIR')
+parser = argparse.ArgumentParser(description='FPGM')
+parser.add_argument('--config', type=str, default='/configs/kvasir.yaml')
+parser.add_argument('--labeled-id-path', type=str, default='/path/your/data/polyp/10%_labeled.txt')
+parser.add_argument('--unlabeled-id-path', type=str, default='/path/your/data/polyp/10%_unlabeled.txt')
+parser.add_argument('--save-path', type=str, default='')
 parser.add_argument('--seed', type=int,  default=1337, help='random seed')
 parser.add_argument('--deterministic', type=int,  default=1, help='whether use deterministic training')
 parser.add_argument('--local_rank', default=0, type=int)
@@ -45,15 +45,6 @@ if args.deterministic:
 
 
 class FreqPerturbation(nn.Module):
-    """
-    通过频谱形状匹配 (Spectral Shape Matching) 进行图像扰动。
-
-    此模块通过以下步骤实现理论上更严谨的知识迁移：
-    1. 从有标签数据的“纯净”边缘信号中学习频率先验 P_prior 的“形状”。
-    2. 对无标签的“混杂”完整图像频谱 P_u 进行归一化，提取其“形状”。
-    3. 在形状空间进行插值，生成新的频谱形状 P_pert_norm。
-    4. 将新的形状乘以 P_u 的原始能量，恢复其尺度，完成扰动。
-    """
     def __init__(self, 
                  gamma: float = 0.05, 
                  momentum: float = 0.999, 
@@ -285,7 +276,6 @@ def main(snapshot_path):
             with torch.no_grad():
                 model.eval()
                 pred_u_w_mix, feat_u_w_mix = model(img_u_w_mix)
-                # 计算原始预测的硬标签和置信度
                 prob_u_w_mix = pred_u_w_mix.softmax(dim=1)
                 conf_u_w_mix, mask_u_w_mix = prob_u_w_mix.max(dim=1)
 
@@ -296,23 +286,20 @@ def main(snapshot_path):
             
             model.train()
 
-            # 4. 学生模型前向传播
             num_lb, num_ulb = img_x.shape[0], img_u_w.shape[0]
 
-            # 有标签 和 无标签弱增强 (带特征扰动)
+            
             (preds, preds_fp), (feat, _) = model(torch.cat((img_x, img_u_w)), True)
             pred_x, pred_u_w = preds.split([num_lb, num_ulb])
             feat_x, feat_u_w = feat.split([num_lb, num_ulb])
             pred_u_w_fp = preds_fp[num_lb:]
 
-            # 强增强
+            
             pred_s1, _ = model(img_u_s1)
             pred_s2, _ = model(img_u_s2)
             pred_u_s = torch.cat((pred_s1, pred_s2), dim=0)
             
             with torch.no_grad():
-
-                # 计算原始预测的硬标签和置信度
                 prob_u_w = pred_u_w.softmax(dim=1)
                 conf_u_w, mask_u_w = prob_u_w.max(dim=1)
 
@@ -320,43 +307,18 @@ def main(snapshot_path):
                 mask_teacher1 = mask_u_w.clone()
                 conf_teacher1 = conf_u_w.clone()
 
-                # 分支2 (对应 img_u_s2)
                 mask_teacher2 = mask_u_w.clone()
                 conf_teacher2 = conf_u_w.clone()
 
-                # --- 对分支1进行混合 ---
                 mask_teacher1[cutmix_box1 == 1] = mask_u_w_mix[cutmix_box1 == 1]
                 conf_teacher1[cutmix_box1 == 1] = conf_u_w_mix[cutmix_box1 == 1]
-
-                                                            
-                # --- 对分支2进行混合 ---
                 mask_teacher2[cutmix_box2 == 1] = mask_u_w_mix[cutmix_box2 == 1]
                 conf_teacher2[cutmix_box2 == 1] = conf_u_w_mix[cutmix_box2 == 1]
 
-                # --- 将两个分支的教师信号合并 ---
-                # 硬伪标签 (用于HC-Loss)
                 mask_teacher_final = torch.cat((mask_teacher1, mask_teacher2), dim=0)
-                # 置信度 (用于定义区域)
+                
                 conf_teacher_final = torch.cat((conf_teacher1, conf_teacher2), dim=0)
-                # 软伪标签 (用于MC-Loss)
-               
-            
-            #if random.random() <= 0.7:
-            #img_u_w_freq = freq_perturber(img_u_w.detach())
-            #pred_u_w_freq, _ = model(img_u_w_freq)
-            #loss_freq1 =criterion_dice(pred_u_w_freq.softmax(dim=1), mask_u_w.unsqueeze(1).float(), ignore=(conf_u_w < cfg['conf_thresh_high']))
-            #else:
-            #    loss_freq1 = 0.0
-
-            #if random.random() <= 0.7:
-            #img_u_w_mix_freq = freq_perturber(img_u_w_mix.detach())
-            #pred_u_w_mix_freq, _ = model(img_u_w_mix_freq)
-            #loss_freq2 = criterion_dice(pred_u_w_mix_freq.softmax(dim=1), mask_u_w_mix.unsqueeze(1).float(), ignore=(conf_u_w_mix < cfg['conf_thresh_high']))
-            #else:
-            #    loss_freq2 = 0.0
-            
-
-            #loss_freq = (loss_freq1 + loss_freq2) / 2.0
+                
             
             img_u_w_freq = freq_perturber(img_u_w.detach())
             pred_u_w_freq, _ = model(img_u_w_freq)
@@ -368,7 +330,6 @@ def main(snapshot_path):
 
             loss_x = (criterion_ce(pred_x, mask_x) + criterion_dice(pred_x.softmax(dim=1), mask_x.unsqueeze(1).float())) / 2.0
             
-            # 7.4 特征扰动损失 (FP-Loss)
             loss_fp = criterion_dice(pred_u_w_fp.softmax(dim=1), mask_u_w.unsqueeze(1).float(),
                              ignore=(conf_u_w < cfg['conf_thresh_high']))
             
@@ -425,7 +386,7 @@ def main(snapshot_path):
     writer.close()
 
 if __name__ == '__main__':
-    snapshot_path = "/home/wth/My_codes/SSL_MIS_Exps/Freq_adaptive_modulation/ablations/polyp_{}_{}labeled/".format('unimatch_freq_prior_matchingnorm_gamma=0.10', 140)
+    snapshot_path = "/polyp_{}_{}labeled/".format('unimatch_freq_prior_matchingnorm_gamma=0.10', 140)
     if not os.path.exists(snapshot_path):
         os.makedirs(snapshot_path)
     logging.basicConfig(filename=snapshot_path+"/log.txt", level=logging.INFO, format='[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%H:%M:%S')
