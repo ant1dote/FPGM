@@ -49,7 +49,7 @@ class FreqPerturbation(nn.Module):
                  gamma: float = 0.05, 
                  momentum: float = 0.999, 
                  dilation_kernel_size: int = 3,
-                 eps: float = 1e-6): # 增加一个小的 epsilon 防止除以零
+                 eps: float = 1e-6): 
         
         super().__init__()
         if not (0.0 <= gamma <= 1.0):
@@ -212,7 +212,7 @@ def main(snapshot_path):
     model.cuda()
     ema_model.cuda()
 
-    freq_perturber = FreqPerturbation(gamma=0.10)#HeuristicFilterPerturbation('low-pass', 16)#RandomBandPerturbation(alpha=0.15, num_peaks=3)
+    freq_perturber = FreqPerturbation(gamma=0.05)
     freq_perturber.cuda()
 
     criterion_ce = nn.CrossEntropyLoss()
@@ -386,12 +386,12 @@ def main(snapshot_path):
     writer.close()
 
 if __name__ == '__main__':
-    snapshot_path = "/polyp_{}_{}labeled/".format('unimatch_freq_prior_matchingnorm_gamma=0.10', 140)
+    snapshot_path = "/polyp_{}_{}labeled/".format('unimatch_freq_prior', 140)
     if not os.path.exists(snapshot_path):
         os.makedirs(snapshot_path)
     logging.basicConfig(filename=snapshot_path+"/log.txt", level=logging.INFO, format='[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%H:%M:%S')
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
     logging.info(str(args))
-    shutil.copy('/home/wth/My_codes/SSL_MIS_Exps/Freq_adaptive_modulation/poly_freq_prior.py', snapshot_path)
+    shutil.copy('/poly_freq_prior.py', snapshot_path)
     main(snapshot_path)
    
