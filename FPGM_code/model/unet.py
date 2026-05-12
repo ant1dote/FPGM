@@ -216,8 +216,7 @@ class UNet(nn.Module):
 class UNet_feat(nn.Module):
     def __init__(self, in_chns, class_num):
         super(UNet_feat, self).__init__()
-        # 假设您的UNet参数和层定义在这里...
-        # 例如:
+        
         params = {'in_chns': in_chns,
                   'feature_chns': [16, 32, 64, 128, 256],
                   'dropout': [0.05, 0.1, 0.2, 0.3, 0.5],
@@ -228,21 +227,19 @@ class UNet_feat(nn.Module):
         self.decoder = Decoder(params)
 
     def forward(self, x, need_fp=False, need_feat=False):
-        # 假设 self.encoder(x) 返回一个特征列表 [feat1, feat2, ..., feat_deepest]
+        
         features = self.encoder(x)
         deepest_feature = features[-1]
         if need_feat:
             return features
 
         if need_fp:
-            # 您的特征扰动逻辑
             fp_features = [torch.cat((feat, nn.Dropout2d(0.5)(feat))) for feat in features]
             output = self.decoder(fp_features)
-            # 返回 (logits, fp_logits) 和 (features, fp_features)
-            # 为了简化，我们只关心无扰动的特征
-            return (output.chunk(2)[0], output.chunk(2)[1]), (deepest_feature, deepest_feature) # 简单复制
+            
+            return (output.chunk(2)[0], output.chunk(2)[1]), (deepest_feature, deepest_feature) 
         else:
             output = self.decoder(features)
-            return output, deepest_feature # 返回 logits 和最深层特征
+            return output, deepest_feature 
         
 
